@@ -3,9 +3,28 @@ import scipy.sparse
 import scipy.sparse.linalg
 import gmsh
 import sys
+import matplotlib.pyplot as plt
 
-from mysolve import *
-DEBUG = True
+import mysolve as my
+DEBUG = False
+# ---------------------------------------------------------
+# ------------------ Variables globales -------------------
+# ---------------------------------------------------------
+
+PRINTF = False      # Affiche les printf de base sur la sortie standard
+PRINT  = True       # Affiche les print personnels
+TEST   = False         # Affiche les propriétés de la matrice
+SAVE   = False        # Enregistre la matrice sous forme png clippé entre 0 et 1 (Real)
+NAME   = 'default'      # Nom du régime
+SolverType = 'scipy'
+
+# ---------------------------------------------------------
+
+ymin  = []
+ymax  = []
+xgap  = []
+mus = {0.999981 : 'Argent', 0.999990 : 'Cuivre', 0.999991 : 'Eau', 1.0000004 : 'Air', 1.000022 : 'Aluminium', 1.000360 : 'Platine', 250 : 'Cobalt', 5000 : 'Fer', 100000 : 'Mu-métal'}
+
 
 # This scripts assembles and solves a simple finite element problem
 # using exclusively the python api of Gmsh.
@@ -13,12 +32,28 @@ DEBUG = True
 cm = 0.01
 
 # Homework model parameters
-ref = 1       # mesh refinement factor
+ref = 0.05    # mesh refinement factor
 gap = 0.2*cm  # core-plate distance
-freq = 50     # working frequency
-vel = 100     # plate velocity
+freq = 0   # working frequency
+vel = 0     # plate velocity
 mur = 100.    # Relative magnetic permeability of region CORE
 
+# ---------------------------------------------------------
+# --------------- Déclare le nom du régime ----------------
+# ---------------------------------------------------------
+
+if(freq == 0):
+    if(vel ==0):
+        NAME = 'Statique'
+    else:
+        NAME = 'Stationnaire'
+else:
+    if(vel == 0):
+        NAME = 'Harmonique'
+    else:
+        NAME = 'Dynamique'
+
+# ---------------------------------------------------------
 
 # geometrical parameters
 L1 = 15*cm # box x-length
@@ -41,6 +76,8 @@ J = 1.e7        # Current density (A/m^2)
 jomega = complex(0, 2*np.pi*freq)
 CoilSection = L4*L4
 Integration = 'Gauss2'
+
+
 
 
 def create_geometry():
@@ -160,9 +197,9 @@ def errorf(*args):
 def solve():
     mshNodes = np.array(model.mesh.getNodes()[0])
     numMeshNodes = len(mshNodes)
-    printf('numMeshNodes =', numMeshNodes)
+    if(PRINTF): printf('numMeshNodes =', numMeshNodes)
     maxNodeTag = int(np.amax(mshNodes))
-    printf('maxNodeTag =', maxNodeTag)
+    if(PRINTF): printf('maxNodeTag =', maxNodeTag)
 
 
     # initializations of global assembly arrays iteratively filled-in during assembly
@@ -195,9 +232,9 @@ def solve():
                 numGroupNodes = len(vNodes)
                 enode = np.array(vNodes).reshape((numElements,-1))
                 numElementNodes = enode.shape[1]
-                printf('\nIn group', tagGroup, ', numElements = e =', numElements)
-                printf('numGroupNodes =', numGroupNodes,', numElementNodes = n =', numElementNodes)
-                printf('%enodes (e,n) =', enode.shape)
+                if(PRINTF): printf('\nIn group', tagGroup, ', numElements = e =', numElements)
+                if(PRINTF): printf('numGroupNodes =', numGroupNodes,', numElementNodes = n =', numElementNodes)
+                if(PRINTF): printf('%enodes (e,n) =', enode.shape)
 
                 # Assembly of stiffness matrix for all 2 dimensional elements
                 # (i.e., triangles or quadrangles)
@@ -207,26 +244,26 @@ def solve():
                     numcomp, sf = model.mesh.getBasisFunctions(elementType, uvw, 'Lagrange')
 
                     numGaussPoints = weights.shape[0]
-                    printf('numGaussPoints = g =', numGaussPoints, ', %weights (g) =', weights.shape)
+                    if(PRINTF): printf('numGaussPoints = g =', numGaussPoints, ', %weights (g) =', weights.shape)
                     sf = np.array(sf).reshape((numGaussPoints,-1))
-                    printf('%sf (g,n) =', sf.shape)
+                    if(PRINTF): printf('%sf (g,n) =', sf.shape)
                     if sf.shape[1] != numElementNodes:
                         errorf('Something went wrong')
                     numcomp, dsfdu = model.mesh.getBasisFunctions(elementType, uvw, 'GradLagrange')
 
                     #remove useless dsfdw
                     dsfdu = np.array(dsfdu).reshape((numGaussPoints,numElementNodes,3))[:,:,:-1]
-                    printf('%dsfdu (g,n,u) =', dsfdu.shape)
+                    if(PRINTF): printf('%dsfdu (g,n,u) =', dsfdu.shape)
 
                     qjac, qdet, qpoint = model.mesh.getJacobians(elementType, uvw, tagEntity)
-                    printf('Gauss integr:',len(qjac),len(qdet),len(qpoint),
+                    if(PRINTF): printf('Gauss integr:',len(qjac),len(qdet),len(qpoint),
                            '= (9, 1, 3) x',numGaussPoints,'x',numElements)
                     qdet = np.array(qdet).reshape((numElements,numGaussPoints))
-                    printf('%qdet (e,g) =', qdet.shape)
+                    if(PRINTF): printf('%qdet (e,g) =', qdet.shape)
                     #remove components of dxdu useless in dimEntity dimensions (here 2D)
                     dxdu = np.array(qjac).reshape((numElements,numGaussPoints,3,3))[:,:,:-1,:-1]
                     # jacobien stored by row, so dxdu[i][j] = dxdu_ij = dxi/duj
-                    printf('%dxdu (e,g,x,u)=', dxdu.shape)
+                    if(PRINTF): printf('%dxdu (e,g,x,u)=', dxdu.shape)
 
                     # material characteristic
                     if tagGroup == CORE:
@@ -236,13 +273,13 @@ def solve():
 
                     # dsdfx = dudx * dsfdu
                     dudx = np.linalg.inv(dxdu) # dudx[j][k] = dudx_jk = duj/dxk
-                    printf('%dudx (e,g,u,x) =', dudx.shape)
+                    if(PRINTF): printf('%dudx (e,g,u,x) =', dudx.shape)
                     dsfdx  = np.einsum("egxu,gnu->egnx",dudx,dsfdu); # sum over u = dot product
-                    printf('%dsfdx (e,g,n,x) =', dsfdx.shape)
+                    if(PRINTF): printf('%dsfdx (e,g,n,x) =', dsfdx.shape)
 
                     # performs the Gauss integration with einsum
                     localmat = nu * np.einsum("egik,egjk,eg,g->eij", dsfdx, dsfdx, qdet, weights)
-                    printf('%localmat (e,n,n) =', localmat.shape)
+                    if(PRINTF): printf('%localmat (e,n,n) =', localmat.shape)
 
                     if tagGroup == PLATE:
                         localmat += sigma*jomega*np.einsum("gi,gj,eg,g->eij", sf, sf, qdet, weights)
@@ -264,7 +301,7 @@ def solve():
                         elif tagGroup == COILN:
                             load = -J
                         localrhs = load * np.einsum("gn,eg,g->en", sf, qdet, weights)
-                        printf('Check rhs:', np.sum(localrhs), "=", load*CoilSection)
+                        if(PRINTF): printf('Check rhs:', np.sum(localrhs), "=", load*CoilSection)
                         rhsrowflat = np.append(rhsrowflat, enode.flatten())
                         rhsflat = np.append(rhsflat, localrhs.flatten())
 
@@ -273,12 +310,13 @@ def solve():
                     for tagNode in vNodes:
                         typNodes[tagNode] = 2
 
-    printf('\nDimension of arrays built by the assembly process')
-    printf('%colflat = ', matcolflat.shape)
-    printf('%rowflat = ', matrowflat.shape)
-    printf('%localmatflat = ', matflat.shape)
-    printf('%rhsrowflat = ', rhsrowflat.shape)
-    printf('%rhsflat = ', rhsflat.shape)
+    if(PRINTF):
+        printf('\nDimension of arrays built by the assembly process')
+        printf('%colflat = ', matcolflat.shape)
+        printf('%rowflat = ', matrowflat.shape)
+        printf('%localmatflat = ', matflat.shape)
+        printf('%rhsrowflat = ', rhsrowflat.shape)
+        printf('%rhsflat = ', rhsflat.shape)
 
     # Associate to all mesh nodes a line number in the system matrix
     # reserving top lines for internal nodes and bottom lines for fixed nodes (boundary nodes).
@@ -289,7 +327,7 @@ def solve():
             index += 1
             node2unknown[tagNode] = index
     numUnknowns = index
-    printf('numUnknowns =', numUnknowns)
+    if(PRINTF): printf('numUnknowns =', numUnknowns)
     for tagNode,typ in enumerate(typNodes):
         if  typ == 2: # fixed
             index += 1
@@ -301,17 +339,20 @@ def solve():
     unknown2node = np.zeros(numMeshNodes+1, dtype=np.int32)
     for node, unkn in enumerate(node2unknown):
         unknown2node[unkn] = node
-
-    printf('\nDimension of nodes vs unknowns arrays')
-    printf('%mshNodes=',mshNodes.shape)
-    printf('%typNodes=',typNodes.shape)
-    printf('%node2unknown=',node2unknown.shape)
-    printf('%unknown2node=',unknown2node.shape)
+    if(PRINTF):
+        printf('\nDimension of nodes vs unknowns arrays')
+        printf('%mshNodes=',mshNodes.shape)
+        printf('%typNodes=',typNodes.shape)
+        printf('%node2unknown=',node2unknown.shape)
+        printf('%unknown2node=',unknown2node.shape)
 
     # Generate system matrix A=globalmat and right hand side b=globalrhs
 
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html
     # 'node2unknown-1' are because python numbers rows and columns from 0
+    if(TEST):
+        print("Nombre d'éléments définis : {}".format(matflat.shape[0]))
+        print("Pourcentage matrice creuse : %.2f %%"%((matflat.shape[0])/((numMeshNodes*numMeshNodes*0.01))))
     globalmat = scipy.sparse.coo_matrix(
         (matflat, (node2unknown[matcolflat.astype(int)]-1, node2unknown[matrowflat.astype(int)]-1) ),
         shape=(numMeshNodes, numMeshNodes)).todense()
@@ -320,37 +361,166 @@ def solve():
     for index,node in enumerate(rhsrowflat):
         globalrhs[node2unknown[int(node)]-1] += rhsflat[int(index)]
 
-    printf('%globalmat =', globalmat.shape, ' %globalrhs =', globalrhs.shape)
+    if(PRINTF): printf('%globalmat =', globalmat.shape, ' %globalrhs =', globalrhs.shape)
 
     A = globalmat[:numUnknowns,:numUnknowns]
+    if TEST : my.all_test(A, NAME)
+    if SAVE : my.plot_matrix(A.real, NAME)
+    S = my.get_min_max_singular_values(A)
+    xgap.append(100*gap)
+    ymin.append(S[0])
+    ymax.append(S[1])
+    if PRINT :
+        print("\nMIN SINGULAR VALUES {}".format(S[0]))
+        print("MAX SINGULAR VALUES {}\n".format(S[1]))
     b = globalrhs[:numUnknowns]
-    success, sol = mysolve(A, b)
+    success, sol = my.mysolve(A, b, SolverType=SolverType)
     if not success:
         errorf('Solver not implemented yet')
     sol = np.append(sol,np.zeros(numMeshNodes-numUnknowns))
-    printf('%sol =', sol.shape)
+    if(PRINTF):printf('%sol =', sol.shape)
 
     # Export solution
     sview = gmsh.view.add("solution")
     gmsh.view.addModelData(sview,0,"","NodeData",unknown2node[1:],sol[:,None])
     #gmsh.view.write(sview,"a.pos")
-    printf('Flux (computed) =', np.max(sol)-np.min(sol))
+    if(PRINTF): printf('Flux (computed) =', np.max(sol)-np.min(sol))
     return
-
 
 model = gmsh.model
 factory = model.geo
-gmsh.initialize(sys.argv)
 
-gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", ref)
-gmsh.option.setNumber("General.Terminal", 1)
-gmsh.option.setNumber("View[0].IntervalsType", 3)
-gmsh.option.setNumber("View[0].NbIso", 20)
+def main():
+    global gap
+    gmsh.initialize(sys.argv)
+    # gmsh.write("ndt.unv")
 
-create_geometry()
-model.mesh.generate(2)
-solve()
-gmsh.fltk.run()
+    gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", ref)
+    gmsh.option.setNumber("General.Terminal", 1)
+    gmsh.option.setNumber("View[0].IntervalsType", 3)
+    gmsh.option.setNumber("View[0].NbIso", 20)
+
+    gap = 0.0001*1
+
+    create_geometry()
+    model.mesh.generate(2)
+    solve()
+    print('k = %f'%(ymax[0]/ymin[0]))
+    gmsh.fltk.run()
+
+def test_inf(type = 'gap'):
+    global gap, mur, mus
+
+    gmsh.initialize(sys.argv)
+    # gmsh.write("ndt.unv")
+
+    gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", ref)
+    gmsh.option.setNumber("General.Terminal", 1)
+    gmsh.option.setNumber("View[0].IntervalsType", 3)
+    gmsh.option.setNumber("View[0].NbIso", 20)
+    if type == 'all' or type=='gap':
+        for i in range(1,200):
+            # MIN GAP : 0.01 cm
+            # MAX GAP : 2.00 cm
+            gap = 0.0001*i
+            create_geometry()
+            model.mesh.generate(2)
+            solve()
+            # gmsh.fltk.run()
+        ALL = np.zeros((3, len(xgap)))
+        ALL[0] = np.array(xgap)
+        ALL[1] = np.array(ymin)
+        ALL[2] = np.array(ymax)
+        np.save('influences/numpy/gap', ALL)
+    if type == 'all' or type=='perm':
+        gap = 0.2*cm
+        for (mur, mat) in mus.items():
+            create_geometry()
+            model.mesh.generate(2)
+            solve()
+            # gmsh.fltk.run()
+        ALL = np.zeros((3, len(xgap)))
+        ALL[0] = np.array(list(mus.keys()))
+        ALL[1] = np.array(ymin)
+        ALL[2] = np.array(ymax)
+        np.save('influences/numpy/perm', ALL)
+
+def plot_results(type = 'gap', value = 'min'):
+    if type=='gap' or type=='all':
+        MATRIX = np.load('influences/numpy/gap.npy')
+        if value == 'min' or value == 'all':
+            plt.figure()
+            plt.xlabel('Largeur de l\'entrefer [cm]')
+            plt.ylabel('Valeurs singulières')
+            # singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
+            singMIN, = plt.plot(MATRIX[0], MATRIX[2], '#9400D3', label='Valeurs singulières maximales')
+            # plt.legend()
+            plt.show()
+            plt.savefig('influences/plots/gap_min')
+        if value == 'max' or value == 'all':
+            plt.figure()
+            plt.xlabel('Largeur de l\'entrefer [cm]')
+            plt.ylabel('Valeurs singulières')
+            singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
+            # singMIN, = plt.plot(MATRIX[0], MATRIX[2], '#9400D3', label='Valeurs singulières maximales')
+            # plt.legend()
+            plt.show()
+            plt.savefig('influences/plots/gap_max')
+        if value == 'k' or value == 'all':
+            plt.figure()
+            plt.xlabel('Largeur de l\'entrefer [cm]')
+            plt.ylabel('Nombre de conditionnement')
+            # singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
+            k, = plt.plot(MATRIX[0], MATRIX[2]/MATRIX[1], '#0080FF', label='Nombre de conditionnement')
+            # plt.legend()
+            plt.show()
+            plt.savefig('influences/plots/gap_k')
+    if type=='perm' or type=='all':
+        MATRIX = np.load('influences/numpy/perm.npy')
+        color  = ['#9400D3', '#FFA500', '#0080FF']
+        labels = ['Diamagnétique', 'Paramagnétique', 'Féromagnétique']
+        if value == 'min' or value == 'all':
+            plt.figure()
+            plt.xlabel('Perméabilité relative')
+            plt.ylabel('Valeurs singulières minimales')
+            plt.xticks(np.arange(9), mus.keys())
+            for i in range(9):
+                if(i%3 == 0):
+                    singMIN, = plt.plot(np.arange(i, i+3), MATRIX[1, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                plt.annotate(list(mus.values())[i], (i, MATRIX[1,i]))
+            plt.legend()
+            plt.show()
+            plt.savefig('influences/plots/perm_min')
+        if value == 'max' or value == 'all':
+            plt.figure()
+            plt.xlabel('Perméabilité relative')
+            plt.ylabel('Valeurs singulières maximales')
+            plt.xticks(np.arange(9), mus.keys())
+            for i in range(9):
+                if(i%3 == 0):
+                    singMIN, = plt.plot(np.arange(i, i+3), MATRIX[2, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                plt.annotate(list(mus.values())[i], (i, MATRIX[2,i]))
+            plt.legend()
+            plt.show()
+            plt.savefig('influences/plots/perm_max')
+        if value == 'k' or value == 'all':
+            plt.figure()
+            plt.xlabel('Perméabilité relative')
+            plt.ylabel('Nombre de conditionnement')
+            plt.xticks(np.arange(9), mus.keys())
+            plt.yscale(value='log')
+            for i in range(9):
+                if(i%3 == 0):
+                    singMIN, = plt.plot(np.arange(i, i+3), MATRIX[2, i:i+3]/MATRIX[1, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                plt.annotate(list(mus.values())[i], (i, MATRIX[2, i]/MATRIX[1, i]))
+            plt.legend()
+            plt.show()
+            plt.savefig('influences/plots/perm_k')
+# test_inf(type = 'perm')
+# plot_results(type = 'perm', value = 'all')
+main()
+
+
 
 # Solve linear system Ax=b
 
