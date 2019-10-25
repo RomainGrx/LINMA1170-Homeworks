@@ -6,13 +6,13 @@ import sys
 import matplotlib.pyplot as plt
 
 import mysolve as my
-DEBUG = False
+DEBUG = True
 # ---------------------------------------------------------
 # ------------------ Variables globales -------------------
 # ---------------------------------------------------------
 
 PRINTF = False      # Affiche les printf de base sur la sortie standard
-PRINT  = True       # Affiche les print personnels
+PRINT  = False       # Affiche les print personnels
 TEST   = False         # Affiche les propriétés de la matrice
 SAVE   = False        # Enregistre la matrice sous forme png clippé entre 0 et 1 (Real)
 NAME   = 'default'      # Nom du régime
@@ -23,7 +23,17 @@ SolverType = 'scipy'
 ymin  = []
 ymax  = []
 xgap  = []
-mus = {0.999981 : 'Argent', 0.999990 : 'Cuivre', 0.999991 : 'Eau', 1.0000004 : 'Air', 1.000022 : 'Aluminium', 1.000360 : 'Platine', 250 : 'Cobalt', 5000 : 'Fer', 100000 : 'Mu-métal'}
+xref  = []
+# xref  = np.arange(1, 5.25, 0.25)
+mus = {0.999981 : 'Argent',
+       0.999990 : 'Cuivre',
+       0.999991 : 'Eau',
+       1.0000004 : 'Air',
+       1.000022 : 'Aluminium',
+       1.000360 : 'Platine',
+       250 : 'Cobalt'}
+       # 5000 : 'Fer',
+       # 100000 : 'Mu-métal'}
 
 
 # This scripts assembles and solves a simple finite element problem
@@ -32,7 +42,7 @@ mus = {0.999981 : 'Argent', 0.999990 : 'Cuivre', 0.999991 : 'Eau', 1.0000004 : '
 cm = 0.01
 
 # Homework model parameters
-ref = 0.05    # mesh refinement factor
+ref = 2    # mesh refinement factor
 gap = 0.2*cm  # core-plate distance
 freq = 0   # working frequency
 vel = 0     # plate velocity
@@ -364,12 +374,14 @@ def solve():
     if(PRINTF): printf('%globalmat =', globalmat.shape, ' %globalrhs =', globalrhs.shape)
 
     A = globalmat[:numUnknowns,:numUnknowns]
-    if TEST : my.all_test(A, NAME)
     if SAVE : my.plot_matrix(A.real, NAME)
-    S = my.get_min_max_singular_values(A)
-    xgap.append(100*gap)
-    ymin.append(S[0])
-    ymax.append(S[1])
+    if TEST :
+        my.all_test(A, NAME)
+        S = my.get_min_max_singular_values(A)
+        xgap.append(100*gap)
+        xref.append(numMeshNodes)
+        ymin.append(S[0])
+        ymax.append(S[1])
     if PRINT :
         print("\nMIN SINGULAR VALUES {}".format(S[0]))
         print("MAX SINGULAR VALUES {}\n".format(S[1]))
@@ -391,38 +403,36 @@ model = gmsh.model
 factory = model.geo
 
 def main():
-    global gap
+    global gap, TEST
+    TEST = False
     gmsh.initialize(sys.argv)
     # gmsh.write("ndt.unv")
 
-    gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", ref)
     gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("View[0].IntervalsType", 3)
     gmsh.option.setNumber("View[0].NbIso", 20)
-
-    gap = 0.0001*1
 
     create_geometry()
     model.mesh.generate(2)
     solve()
-    print('k = %f'%(ymax[0]/ymin[0]))
+    # print('k = %f'%(ymax[0]/ymin[0]))
     gmsh.fltk.run()
 
 def test_inf(type = 'gap'):
-    global gap, mur, mus
+    global gap, mur, mus, ref, TEST, PRINT, PRINTF
+    TEST = True
+    [PRINT, PRINTF] = 2*[False]
 
     gmsh.initialize(sys.argv)
     # gmsh.write("ndt.unv")
 
-    gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", ref)
     gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("View[0].IntervalsType", 3)
     gmsh.option.setNumber("View[0].NbIso", 20)
     if type == 'all' or type=='gap':
-        for i in range(1,200):
-            # MIN GAP : 0.01 cm
-            # MAX GAP : 2.00 cm
-            gap = 0.0001*i
+        for gap in np.arange(0.0001, 0.005, 0.0005):
+            # MIN GAP : 0.1 cm
+            # MAX GAP : 2.0 cm
             create_geometry()
             model.mesh.generate(2)
             solve()
@@ -432,7 +442,31 @@ def test_inf(type = 'gap'):
         ALL[1] = np.array(ymin)
         ALL[2] = np.array(ymax)
         np.save('influences/numpy/gap', ALL)
+    if type == 'all' or type=='ref':
+        for ref in range(1, 6):
+            print('REF ======= %d'%ref)
+            create_geometry()
+            model.mesh.generate(2)
+            solve()
+            # gmsh.fltk.run()
+        ALL = np.zeros((3, len(xref)))
+        ALL[0] = np.array(xref)
+        ALL[1] = np.array(ymin)
+        ALL[2] = np.array(ymax)
+        np.save('influences/numpy/ref', ALL)
     if type == 'all' or type=='perm':
+        gap = 0.2*cm
+        for mur in range(1,300):
+            create_geometry()
+            model.mesh.generate(2)
+            solve()
+            # gmsh.fltk.run()
+        ALL = np.zeros((3, len(xgap)))
+        ALL[0] = np.arange(1,300)
+        ALL[1] = np.array(ymin)
+        ALL[2] = np.array(ymax)
+        np.save('influences/numpy/perm', ALL)
+    if type == 'all' or type=='experm':
         gap = 0.2*cm
         for (mur, mat) in mus.items():
             create_geometry()
@@ -443,38 +477,57 @@ def test_inf(type = 'gap'):
         ALL[0] = np.array(list(mus.keys()))
         ALL[1] = np.array(ymin)
         ALL[2] = np.array(ymax)
-        np.save('influences/numpy/perm', ALL)
+        np.save('influences/numpy/experm', ALL)
 
 def plot_results(type = 'gap', value = 'min'):
+
+    plt.rcParams["figure.figsize"] = (20,10)
     if type=='gap' or type=='all':
         MATRIX = np.load('influences/numpy/gap.npy')
-        if value == 'min' or value == 'all':
-            plt.figure()
-            plt.xlabel('Largeur de l\'entrefer [cm]')
-            plt.ylabel('Valeurs singulières')
-            # singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
-            singMIN, = plt.plot(MATRIX[0], MATRIX[2], '#9400D3', label='Valeurs singulières maximales')
-            # plt.legend()
-            plt.show()
-            plt.savefig('influences/plots/gap_min')
         if value == 'max' or value == 'all':
             plt.figure()
             plt.xlabel('Largeur de l\'entrefer [cm]')
-            plt.ylabel('Valeurs singulières')
-            singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
-            # singMIN, = plt.plot(MATRIX[0], MATRIX[2], '#9400D3', label='Valeurs singulières maximales')
-            # plt.legend()
-            plt.show()
+            plt.ylabel('Valeurs singulières maximales')
+            singMIN, = plt.plot(MATRIX[0], MATRIX[2], '#9400D3', label='Valeurs singulières maximales')
             plt.savefig('influences/plots/gap_max')
+            plt.show()
+        if value == 'min' or value == 'all':
+            plt.figure()
+            plt.xlabel('Largeur de l\'entrefer [cm]')
+            plt.ylabel('Valeurs singulières minimales')
+            singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
+            plt.savefig('influences/plots/gap_min')
+            plt.show()
         if value == 'k' or value == 'all':
             plt.figure()
             plt.xlabel('Largeur de l\'entrefer [cm]')
             plt.ylabel('Nombre de conditionnement')
-            # singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
             k, = plt.plot(MATRIX[0], MATRIX[2]/MATRIX[1], '#0080FF', label='Nombre de conditionnement')
-            # plt.legend()
-            plt.show()
             plt.savefig('influences/plots/gap_k')
+            plt.show()
+    if type=='ref' or type=='all':
+        MATRIX = np.load('influences/numpy/ref.npy')
+        if value == 'max' or value == 'all':
+            plt.figure()
+            plt.xlabel('Nombre de noeuds')
+            plt.ylabel('Valeurs singulières maximales')
+            singMIN, = plt.plot(MATRIX[0], MATRIX[2], '#9400D3', label='Valeurs singulières maximales')
+            plt.savefig('influences/plots/ref_max')
+            plt.show()
+        if value == 'min' or value == 'all':
+            plt.figure()
+            plt.xlabel('Nombre de noeuds')
+            plt.ylabel('Valeurs singulières minimales')
+            singMAX, = plt.plot(MATRIX[0], MATRIX[1], '#FFA500', label='Valeurs singulières minimales')
+            plt.savefig('influences/plots/ref_min')
+            plt.show()
+        if value == 'k' or value == 'all':
+            plt.figure()
+            plt.xlabel('Nombre de noeuds')
+            plt.ylabel('Nombre de conditionnement')
+            k, = plt.plot(MATRIX[0], MATRIX[2]/MATRIX[1], '#0080FF', label='Nombre de conditionnement')
+            plt.savefig('influences/plots/ref_k')
+            plt.show()
     if type=='perm' or type=='all':
         MATRIX = np.load('influences/numpy/perm.npy')
         color  = ['#9400D3', '#FFA500', '#0080FF']
@@ -483,10 +536,44 @@ def plot_results(type = 'gap', value = 'min'):
             plt.figure()
             plt.xlabel('Perméabilité relative')
             plt.ylabel('Valeurs singulières minimales')
+            plt.plot(MATRIX[0], MATRIX[1], color[0])
+            plt.annotate(list(mus.values())[3], (1, MATRIX[1, 0]))
+            plt.annotate(list(mus.values())[6], (250, MATRIX[1, 249]))
+            plt.savefig('influences/plots/perm_min')
+            plt.show()
+        if value == 'max' or value == 'all':
+            plt.figure()
+            plt.xlabel('Perméabilité relative')
+            plt.ylabel('Valeurs singulières maximales')
+            plt.plot(MATRIX[0], MATRIX[2], color[1])
+            plt.annotate(list(mus.values())[3], (1, MATRIX[2, 0]))
+            plt.annotate(list(mus.values())[6], (250, MATRIX[2, 249]))
+            plt.savefig('influences/plots/perm_max')
+            plt.show()
+        if value == 'k' or value == 'all':
+            plt.figure()
+            plt.xlabel('Perméabilité relative')
+            plt.ylabel('Nombre de conditionnement')
+            plt.plot(MATRIX[0], MATRIX[2]/MATRIX[1], color[2])
+            plt.annotate(list(mus.values())[3], (1, MATRIX[2, 0]/MATRIX[1, 0]))
+            plt.annotate(list(mus.values())[6], (250, MATRIX[2, 249]/MATRIX[1, 249]))
+            plt.savefig('influences/plots/perm_k')
+            plt.show()
+    if type=='experm' or type=='all':
+        MATRIX = np.load('influences/numpy/perm.npy')
+        color  = ['#9400D3', '#FFA500', '#0080FF']
+        labels = ['Diamagnétique', 'Paramagnétique', 'Féromagnétique']
+        if value == 'min' or value == 'all':
+            plt.figure()
+            plt.xlabel('Perméabilité relative')
+            plt.ylabel('Valeurs singulières minimales')
             plt.xticks(np.arange(9), mus.keys())
-            for i in range(9):
+            for i in range(len(list(mus.keys()))):
                 if(i%3 == 0):
-                    singMIN, = plt.plot(np.arange(i, i+3), MATRIX[1, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                    if(i!=6):
+                        singMIN, = plt.plot(np.arange(i, i+3), MATRIX[1, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                    else:
+                        singMIN, = plt.plot(np.arange(i, i+1), MATRIX[1, i:i+1], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
                 plt.annotate(list(mus.values())[i], (i, MATRIX[1,i]))
             plt.legend()
             plt.show()
@@ -498,7 +585,10 @@ def plot_results(type = 'gap', value = 'min'):
             plt.xticks(np.arange(9), mus.keys())
             for i in range(9):
                 if(i%3 == 0):
-                    singMIN, = plt.plot(np.arange(i, i+3), MATRIX[2, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                    if(i!=6):
+                        singMIN, = plt.plot(np.arange(i, i+3), MATRIX[2, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                    else:
+                        singMIN, = plt.plot(np.arange(i, i+1), MATRIX[2, i:i+1], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
                 plt.annotate(list(mus.values())[i], (i, MATRIX[2,i]))
             plt.legend()
             plt.show()
@@ -508,17 +598,23 @@ def plot_results(type = 'gap', value = 'min'):
             plt.xlabel('Perméabilité relative')
             plt.ylabel('Nombre de conditionnement')
             plt.xticks(np.arange(9), mus.keys())
-            plt.yscale(value='log')
             for i in range(9):
                 if(i%3 == 0):
-                    singMIN, = plt.plot(np.arange(i, i+3), MATRIX[2, i:i+3]/MATRIX[1, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                    if(i!=6):
+                        singMIN, = plt.plot(np.arange(i, i+3), MATRIX[2, i:i+3]/MATRIX[1, i:i+3], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
+                    else:
+                        singMIN, = plt.plot(np.arange(i, i+1), MATRIX[2, i:i+1]/MATRIX[1, i:i+1], color = color[int(i/3)], label=labels[int(i/3)], marker='.', linestyle = 'None')
                 plt.annotate(list(mus.values())[i], (i, MATRIX[2, i]/MATRIX[1, i]))
             plt.legend()
             plt.show()
             plt.savefig('influences/plots/perm_k')
-# test_inf(type = 'perm')
-# plot_results(type = 'perm', value = 'all')
-main()
+ref = 1
+test_inf(type = 'gap')
+plot_results(type = 'gap', value = 'all')
+# PRINTF = True
+# ref = 5
+# main()
+
 
 
 
