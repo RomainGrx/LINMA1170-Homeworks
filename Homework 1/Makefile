@@ -18,5 +18,8 @@ pdf :
 open :
 	open hw1.pdf
 
+zip : pdf
+	zip myzip.zip hw1.pdf hw1.tex
+
 clean :
 	rm -rf *.log *.aux

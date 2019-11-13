@@ -374,6 +374,7 @@ def solve():
     if(PRINTF): printf('%globalmat =', globalmat.shape, ' %globalrhs =', globalrhs.shape)
 
     A = globalmat[:numUnknowns,:numUnknowns]
+    print(np.linalg.inv(A))
     if SAVE : my.plot_matrix(A.real, NAME)
     if TEST :
         my.all_test(A, NAME)
@@ -608,12 +609,14 @@ def plot_results(type = 'gap', value = 'min'):
             plt.legend()
             plt.show()
             plt.savefig('influences/plots/perm_k')
-ref = 1
-test_inf(type = 'gap')
-plot_results(type = 'gap', value = 'all')
+ref = 5
+# test_inf(type = 'gap')
+# plot_results(type = 'gap', value = 'all')
+TEST = False
+PRINT = False
 # PRINTF = True
 # ref = 5
-# main()
+main()
 
 
 
