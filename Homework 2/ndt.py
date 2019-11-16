@@ -3,10 +3,10 @@ import scipy.sparse
 import scipy.sparse.linalg
 import gmsh
 import sys
-import matplotlib.pyplot as plt
 
 import mysolve as my
 DEBUG = True
+PY3 = sys.version_info.major == 3
 # ---------------------------------------------------------
 # ------------------ Variables globales -------------------
 # ---------------------------------------------------------
@@ -22,18 +22,6 @@ SolverType = 'scipy'
 
 ymin  = []
 ymax  = []
-xgap  = []
-xref  = []
-# xref  = np.arange(1, 5.25, 0.25)
-mus = {0.999981 : 'Argent',
-       0.999990 : 'Cuivre',
-       0.999991 : 'Eau',
-       1.0000004 : 'Air',
-       1.000022 : 'Aluminium',
-       1.000360 : 'Platine',
-       250 : 'Cobalt'}
-       # 5000 : 'Fer',
-       # 100000 : 'Mu-métal'}
 
 
 # This scripts assembles and solves a simple finite element problem
@@ -42,11 +30,12 @@ mus = {0.999981 : 'Argent',
 cm = 0.01
 
 # Homework model parameters
-ref = 2    # mesh refinement factor
+ref = 1    # mesh refinement factor
 gap = 0.2*cm  # core-plate distance
 freq = 0   # working frequency
 vel = 0     # plate velocity
 mur = 100.    # Relative magnetic permeability of region CORE
+Nodes = 0
 
 # ---------------------------------------------------------
 # --------------- Déclare le nom du régime ----------------
@@ -186,8 +175,6 @@ def create_geometry():
     model.setPhysicalName(1, 11, 'DIR')
     return
 
-import sys
-PY3 = sys.version_info.major == 3
 def printf(*args):
     if not DEBUG: return
     if PY3:
@@ -205,6 +192,7 @@ def errorf(*args):
     exit(1)
 
 def solve():
+    global Nodes
     mshNodes = np.array(model.mesh.getNodes()[0])
     numMeshNodes = len(mshNodes)
     if(PRINTF): printf('numMeshNodes =', numMeshNodes)
@@ -373,18 +361,18 @@ def solve():
 
     if(PRINTF): printf('%globalmat =', globalmat.shape, ' %globalrhs =', globalrhs.shape)
 
+    Nodes = globalmat.shape[0]
     A = globalmat[:numUnknowns,:numUnknowns]
     if SAVE : my.plot_matrix(A.real, NAME)
     if TEST :
         #my.all_test(A, NAME)
         S = my.get_min_max_singular_values(A)
-        xgap.append(100*gap)
-        xref.append(numMeshNodes)
         ymin.append(S[0])
         ymax.append(S[1])
     if PRINT :
-        print("\nMIN SINGULAR VALUES {}".format(S[0]))
-        print("MAX SINGULAR VALUES {}\n".format(S[1]))
+        print("\nMIN SINGULAR VALUES %.2f"%(S[0]))
+        print("MAX SINGULAR VALUES %.2f"%(S[1]))
+        print("CONDITIONNEMENT %.2f\n"%(S[1]/S[0]))
     b = globalrhs[:numUnknowns]
     success, sol = my.mysolve(A, b)
     if not success:
@@ -404,11 +392,10 @@ factory = model.geo
 
 def main(show=True, test=False, save=False):
     global PRINTF, PRINT, TEST, SAVE
-    if show:
+    if test:
+        TEST  = True
         PRINT = True
         PRINTF= True
-    if test:
-        TEST = False
     if save:
         SAVE = True
     gmsh.initialize(sys.argv)

@@ -9,6 +9,8 @@
 
 import numpy as np
 import scipy.linalg as l
+import QR
+import time
 SOLVER = None
 
 # ======================= SOLVER ==============================
@@ -17,99 +19,120 @@ SOLVER = None
 # In[1]
 
 def QRsolve(A,b):
-    return None
+    """
+    Args:
+        A (numpy.array) : Coefficient matrix
+        b (numpy.array) : Dependent variable values
+    Returns:
+        x (numpy.array) : The solution of the linear system 'Ax=b'
+    """
+    A = np.asarray(A)
+    V, R = QRfactorize(A)
+    Q = np.divide(V, np.outer(np.ones(len(A)), np.diagonal(R)))
+    y = (Q.T)@b
+    x = backward(R, y)
+    return x
 
 def QRfactorize(A):
     """
     Args:
         A (numpy.array) : Matrix to be factorized
     Returns:
-        numpy.array : factorized matrix A
+        V (numpy.array) : Contains wk vectors to construct Q matrix
+        R (numpy.array) : triangular matrix
     """
-    return None
+    m,n = A.shape
+    R = np.zeros_like(A, shape=(n,n))
+    V = np.array(A)
+
+    # np.fill_diagonal(R, np.linalg.norm(A, axis=0))
+    # Q = np.divide(A, R.diagonal())
+
+    for i in range(n):
+        R[i,i] = np.linalg.norm(V[:,i], axis=0)
+        vr = np.divide(V[:,i], R[i,i])
+        R[i,i+1:n] = vr @ V[:,i+1:n]
+        V[:,i+1:n] -= np.einsum('i,j->ij', vr, R[i,i+1:n])
+    return (V, R)
+
 
 # ------------------------- LU ----------------------------
 # In[2]
 
 def forward(L,b):
     n = len(b)
-    y = np.zeros(n)
+    y = np.zeros_like(b)
     for i in range(n):
-        y[i] = b[i] - np.dot(L[i, :i], y[:i])
+        y[i] = b[i] - np.einsum('j,j->', L[i,:i], y[:i])
     return y
 
 def backward(U, y):
-    x = np.zeros(len(y))
+    x = np.zeros_like(y)
     for i in range(len(x)-1, -1, -1):
-      x[i] = (y[i] - np.dot(U[i, i:], x[i:])) / U[i, i]
+      x[i] = np.divide((y[i] - np.einsum('i,i->', U[i, i:], x[i:])), U[i, i])
     return x
 
-def LUsolve(A,b,P):
-    A  = np.dot(P, A)
+def LUsolve(A,b):
+    A = np.asarray(A)
+    A, P = pivot(A)
     b  = np.dot(P, b)
     MY = LU(A)
+    U = np.triu(MY, 0)
     y  = forward(MY,b)
-    return backward(MY, y)
+    return backward(U, y)
+
+def ILUsolve(A,b):
+    A = np.asarray(A)
+    A, P = pivot(A)
+    b  = np.dot(P, b)
+    MY = ILU0(A)
+    U = np.triu(MY, 0)
+    y  = forward(MY,b)
+    return backward(U, y)
 
 
 def pivot(A):
+    """
+    Args:
+        A (numpy.array) : Matrix to be pivoted
+    Returns:
+        A (numpy.array) : Matrix pivoted such that all diagonal elements are the sub-maximum
+    """
     m = len(A)
+    copy = A.copy()
     P = np.eye(m)
     for j in range(m):
-        row = np.argmax(abs(A[j:m,j]))+j
+        row = np.argmax(abs(copy[j:m,j]))+j
         if j != row:
-            P[j], P[row] = P[row], P[j]
+            P[[j, row]] = P[[row, j]]
+            copy[[j,row]] = copy[[row,j]]
 
-    return P
+    return copy, P
 
-def LU(PA):
+def LU(A):
     """
     Args:
         A (numpy.array) : Matrix to be factorized as LU
     Returns:
         LU (numpy.array) : The lower and the upper matrix squeezed
     """
-    LU = PA.copy()
+    LU = np.array(A)
     n = LU.shape[0]
-
     for k in range(n):
-        LU[k+1:,k] = LU[k+1:,k] / LU[k,k]
-        LU[k+1:,k+1:] = LU[k+1:,k+1:] - np.outer( LU[k+1:,k], LU[k,k+1:] )
-
+        LU[k+1:,k] = np.divide(LU[k+1:,k], LU[k,k])
+        LU[k+1:,k+1:] -= np.einsum('i,j->ij' ,LU[k+1:,k], LU[k,k+1:] )
     return LU
 
-def LU_OLD(A):
-    """
-    Args:
-        A (numpy.array) : Matrix to be factorized as LU
-    Returns:
-        P (numpy.array) : The pivot matrix
-        L (numpy.array) : The lower factorized matrix
-        U (numpy.array) : The upper factorized matrix
-    """
-    n = len(A)
-
-    L = np.zeros((n,n))
-    U = np.zeros((n,n))
-
-    P = pivot(A)
-    PA = np.dot(P, A)
-
-    for j in range(n):
-        L[j, j] = 1.0
-
-        for i in range(j+1):
-            s1 = sum(U[k, j] * L[i, k] for k in range(i))
-            U[i, j] = PA[i, j] - s1
-
-        for i in range(j, n):
-            s2 = sum(U[k, j] * L[i, k] for k in range(j))
-            L[i, j] = (PA[i, j] - s2) / U[j, j]
-
-    return (P, L, U)
-
 def ILU0(A):
-    return None
+    A = np.array(A)
+    n = len(A)
+    for i in range(1,n):
+        index = np.nonzero(A[i,:i])[0]
+        for k in index:
+            subindex = np.nonzero(A[i,k+1:n])[0] + (k+1)
+            A[i,k] /= A[k,k]
+            A[i,subindex] -= A[i,k]*A[k,subindex]
+    return A
 
 # ======================= PLOTER ==============================
 # In[3]
@@ -119,8 +142,9 @@ def setSolver(solver):
     SOLVER = solver
 
 def mysolve(A, b):
+    global SOLVER
     if SOLVER == "LU":
-        return True, LUsolve(A, b, 0)
+        return True, LUsolve(A, b)
     elif SOLVER == "QR":
         return True, QRsolve(A, b)
     else:
@@ -216,45 +240,19 @@ def save_matrix(A, filename):
 # ----------------------------------------------------------
 
 def get_singular_values(A):
-    return svd(A)[1]
+    return np.linalg.svd(A)[1]
 
 def get_min_max_singular_values(A):
-    S = svd(A)[1]
+    S = np.linalg.svd(A)[1]
     return [min(S), max(S)]
 
 # ----------------------------------------------------------
-
-
-# A = np.array([[1, 1, 1 ],
-#               [2, 3, -1],
-#               [1, -1, 1]])
-
-# A = np.array([[2, -1, 0, 0, 0],
-#      [-1, 2, -1, 0, 0],
-#      [0, -1, 2, -1, 0],
-#      [0, 0, -1, 2, -1],
-#      [0, 0, 0, -1, 2]])
-
-A = np.array([[1,1,-1],[1,-2,3],[2,3,1]])
-
-b = np.array([6, 5, -1])
-
-# P, L, U = LU(A)
-
-# print(L)
-# print(L_inv(L))
-
-B = np.array([[1,0,0],[1.5, 1, 0],[3, 14, 1]])
-
-MYL = np.array([[1, 0, 0],
-                [1, 1, 0],
-                [1, 1, 1]])
-MYB = np.array([6, 3, 1])
-
-MYU = np.array([[1, 1, 1],
-                [0, 1, 1],
-                [0, 0, 1]])
-
-B = np.dot(pivot(A), A)
-# print(LU_vectorized(B))
-print(LUsolve(MYU, MYB, pivot(MYU)))
+n = 3
+A = np.random.rand(n+1,n)
+b = np.random.rand(n)
+print(A,'\n')
+Q,R = np.linalg.qr(A)
+print(Q@R,'\n')
+V,R = QRfactorize(A)
+Q = np.divide(V, np.outer(np.ones(len(A)), np.diagonal(R)))
+print(Q@R,'\n')

@@ -1,0 +1,42 @@
+\documentclass{article}[11pt]
+\input{res/tex/settings.tex}
+\graphicspath{res/plots/}
+
+\begin{document}
+\mytitle
+\section{LU}
+\subsection{Factorisation}
+
+Cette factorisation a pour but de factoriser la matrice initiale \python{A} en une matrice \textit{triangulaire inférieure} \python{L} et une matrice \textit{triangulaire supérieure} \python{U} ainsi, {A = LU}.
+Cette factorisation cherche d'abord a faire un \textit{pivotage partiel}, ainsi les lignes sont échangées pour mettre les éléments maximums sous la diagonale sur l'élément de la diagonale, de cette manière on évitera par la suite de diviser par zéro lorsque l'on divisera par le pivot. Ensuite, on applique les \textit{éliminiations de Gauss} de manière itérative sur chaque éléments de \python{L} et de \python{U}. Comme nous sommes en Python, j'ai cherché à vectoriser un maximum de boucles, ce qui nous donne l'algorithme de 3 lignes suivant une fois la matrice pivotée:
+\showCode{res/py/LU.py}
+
+\subsection{Résolution}
+
+Ayant \python{A} comme étant deux \textit{matrices triangulaires}, nous pouvons résoudre de la manière suivante en appliquant pour la résolution avec \python{L}, une substitution avant et avec \python{U}, une substitiution arrière.
+\begin{align*}
+    Ax&=b \\
+    LUx&=b \\
+    Ly&=b \\
+    Ux&=y
+\end{align*}
+
+\section{Factorisation QR}
+
+\section{Analyse}
+\subsection{Complexité temporelle sur maillages différents}
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=18cm]{res/plots/complexite.png}
+    \caption{Complexité temporelle de résolution avec LU et QR}
+    \label{fig:compRef}
+\end{figure}
+\subsection{Complexité temporelle sur régimes différents}
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=18cm]{res/plots/regimes.png}
+    \caption{Complexité temporelle de résolution avec LU et QR sur les 4 régimes}
+    \label{fig:compReg}
+\end{figure}
+
+\end{document}
