@@ -11,17 +11,22 @@ PY3 = sys.version_info.major == 3
 # ------------------ Variables globales -------------------
 # ---------------------------------------------------------
 
-PRINTF = False      # Affiche les printf de base sur la sortie standard
+PRINTF = False       # Affiche les printf de base sur la sortie standard
 PRINT  = False       # Affiche les print personnels
-TEST   = False         # Affiche les propriétés de la matrice
-SAVE   = False        # Enregistre la matrice sous forme png clippé entre 0 et 1 (Real)
-NAME   = 'default'      # Nom du régime
-SolverType = 'scipy'
+TEST   = False       # Affiche les propriétés de la matrice
+SAVE   = False       # Enregistre la matrice sous forme png clippé entre 0 et 1 (Real)
+SOLVE  = False       # Résous le système
+NAME   = 'default'   # Nom du régime
+SolverType = 'scipy' # Nom du solver
 
 # ---------------------------------------------------------
 
 ymin  = []
 ymax  = []
+k     = []
+A = 0
+b = 0
+sol = 0
 
 
 # This scripts assembles and solves a simple finite element problem
@@ -192,7 +197,7 @@ def errorf(*args):
     exit(1)
 
 def solve():
-    global Nodes
+    global Nodes, A, b, x
     mshNodes = np.array(model.mesh.getNodes()[0])
     numMeshNodes = len(mshNodes)
     if(PRINTF): printf('numMeshNodes =', numMeshNodes)
@@ -365,39 +370,47 @@ def solve():
     A = globalmat[:numUnknowns,:numUnknowns]
     if SAVE : my.plot_matrix(A.real, NAME)
     if TEST :
-        #my.all_test(A, NAME)
-        S = my.get_min_max_singular_values(A)
+        # my.all_test(A, NAME)
+        S = get_min_max_singular_values(A)
         ymin.append(S[0])
         ymax.append(S[1])
+        k.append(S[1]/S[0])
     if PRINT :
         print("\nMIN SINGULAR VALUES %.2f"%(S[0]))
         print("MAX SINGULAR VALUES %.2f"%(S[1]))
         print("CONDITIONNEMENT %.2f\n"%(S[1]/S[0]))
     b = globalrhs[:numUnknowns]
-    success, sol = my.mysolve(A, b)
-    if not success:
-        errorf('Solver not implemented yet')
-    sol = np.append(sol,np.zeros(numMeshNodes-numUnknowns))
-    if(PRINTF):printf('%sol =', sol.shape)
+    if(SOLVE):
+        success, x = my.mysolve(A, b)
+        if not success:
+            errorf('Solver not implemented yet')
+        sol = np.append(x,np.zeros(numMeshNodes-numUnknowns))
+        if(PRINTF):printf('%sol =', sol.shape)
 
-    # Export solution
-    sview = gmsh.view.add("solution")
-    gmsh.view.addModelData(sview,0,"","NodeData",unknown2node[1:],sol[:,None])
-    #gmsh.view.write(sview,"a.pos")
-    if(PRINTF): printf('Flux (computed) =', np.max(sol)-np.min(sol))
+        # Export solution
+        sview = gmsh.view.add("solution")
+        gmsh.view.addModelData(sview,0,"","NodeData",unknown2node[1:],sol[:,None])
+        #gmsh.view.write(sview,"a.pos")
+        if(PRINTF): printf('Flux (computed) =', np.max(sol)-np.min(sol))
     return
 
 model = gmsh.model
 factory = model.geo
 
-def main(show=True, test=False, save=False):
-    global PRINTF, PRINT, TEST, SAVE
+def get_min_max_singular_values(A):
+    S = np.linalg.svd(A)[1]
+    return [min(S), max(S)]
+
+def main(show=True, test=False, save=False, solver=True):
+    global PRINTF, PRINT, TEST, SAVE, SOLVE
     if test:
         TEST  = True
         PRINT = True
         PRINTF= True
     if save:
         SAVE = True
+    if solver:
+        SOLVE = True
     gmsh.initialize(sys.argv)
     # gmsh.write("ndt.unv")
 
@@ -409,3 +422,7 @@ def main(show=True, test=False, save=False):
     model.mesh.generate(2)
     solve()
     if show : gmsh.fltk.run()
+
+if __name__=='__main__':
+    my.setSolver('LU')
+    main(solver=True)

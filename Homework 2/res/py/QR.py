@@ -1,5 +1,16 @@
 import numpy as np
 
+def QR(A):
+    R = np.zeros_like(A, shape=(n,n))
+    V = np.array(A)
+    m,n = V.shape
+    for i in range(n):
+        R[i,i]      = np.linalg.norm(V[:,i], axis=0)
+        Qi          = np.divide(V[:,i], R[i,i])
+        R[i,i+1:n]  = Qi @ V[:,i+1:n]
+        V[:,i+1:n] -= np.einsum('i,j->ij', Qi, R[i,i+1:n])
+    return V, R
+
 def dummy_modified_gs(A):
     n = len(A)
     R = np.zeros_like(A)
