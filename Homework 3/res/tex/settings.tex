@@ -1,0 +1,79 @@
+\usepackage{xparse}
+\usepackage{fancyhdr}
+\usepackage{pgf,tikz}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[a4paper,left=2cm,right=2cm,top=2.5cm,bottom=2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{pifont}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage[]{algorithm2e}
+\usepackage{hyperref}
+
+% NEW COMMANDS & DEFINE
+\definecolor{pythonColor}{HTML}{B634F6}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codered}{rgb}{1.0,0.2,0.2}
+\definecolor{codeyellow}{rgb}{1.0,1.0,0.2}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{1.0,1.0,1.0}
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codepurple},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=true,
+    breaklines=true,
+    % captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=10pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=false
+}
+
+\lstset{style=mystyle,
+        extendedchars=true,
+        inputencoding=latin1}
+\newcommand{\python}[1]{\textcolor{pythonColor}{\textit{#1}}}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0.5pt}
+\newcommand{\showCode}[1]{\lstinputlisting[language=Python]{#1}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+% \newdateformat{formatdate}{%
+%   \monthname[\THEMONTH], \THEYEAR}
+
+
+% DOCUMENTS SETTINGS
+\newcommand{\titre}{LU creux}
+\newcommand{\devoir}{Analyse Numérique : Devoir 3}
+\newcommand{\auteur}{Romain Graux}
+\newcommand{\noma}{28681700}
+\newcommand{\mytitle}{
+    % \raggedbottom
+    \lhead{\auteur}
+    \rhead{\today}
+    \lfoot{28681700}
+    \rfoot{\titre}
+    \pagestyle{fancy}
+    \begin{center}
+        \huge{{\textbf{\devoir}}}
+
+        \Huge{\textit{\textbf{\titre}}}
+    \end{center}
+    % \vspace{0.7cm}
+}

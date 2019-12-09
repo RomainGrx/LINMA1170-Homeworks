@@ -184,7 +184,7 @@ if __name__=='__main__':
     setVariables(ref=ref)
     for s in range(len(Solvers)):
         print('%.2f secondes pour résoudre le système avec %s et un raffinement de %d'%(timer(Solvers[s], show=False),Solvers[s],ref))
-        
+
     # plot_regimes(mean=2, ref=2)
     # plot_ref()
     # plot_ilu()
