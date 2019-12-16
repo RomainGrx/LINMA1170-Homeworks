@@ -4,8 +4,7 @@ import scipy.sparse.linalg
 import gmsh
 import sys
 import matplotlib.pyplot as plt
-import LU
-import mysolve as my
+import csrGMRES as my
 DEBUG = True
 PY3 = sys.version_info.major == 3
 # ---------------------------------------------------------
@@ -397,6 +396,7 @@ def solve():
         print("MAX SINGULAR VALUES %.2f"%(S[1]))
         print("CONDITIONNEMENT %.2f\n"%(S[1]/S[0]))
     b = globalrhs[:numUnknowns]
+    print('Size of b : ', len(b))
     if(SOLVE):
         success, x = my.mysolve(A, b, **kwargs)
         if not success:
@@ -442,5 +442,5 @@ model = gmsh.model
 factory = model.geo
 
 if __name__=='__main__':
-    my.setSolver('LUcsr')
-    main(show=True, solver=True, RCMK=True)
+    # my.setSolver('LUcsr')
+    main(show=True, solver=True, test=True)
