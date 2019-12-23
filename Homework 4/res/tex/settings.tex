@@ -1,4 +1,3 @@
-\usepackage{xparse}
 \usepackage{fancyhdr}
 \usepackage{pgf,tikz}
 \usepackage[utf8]{inputenc}
@@ -6,16 +5,14 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{graphicx}
-\usepackage{amsmath}
 \usepackage[a4paper,left=2cm,right=2cm,top=2.5cm,bottom=2cm]{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{array}
 \usepackage{pifont}
 \usepackage{makecell}
-\usepackage{xcolor}
 \usepackage[]{algorithm2e}
-\usepackage{datetime}
+\usepackage{float}
 
 % NEW COMMANDS & DEFINE
 \definecolor{pythonColor}{HTML}{B634F6}
@@ -45,26 +42,35 @@
     frame=false
 }
 
-\lstset{style=mystyle}
+\lstset{style=mystyle,
+        extendedchars=true,
+        inputencoding=latin1}
 \newcommand{\python}[1]{\textcolor{pythonColor}{\textit{#1}}}
 \renewcommand{\headrulewidth}{0.5pt}
 \renewcommand{\footrulewidth}{0.5pt}
 \newcommand{\showCode}[1]{\lstinputlisting[language=Python]{#1}}
-\newdateformat{bottomDate}{%
-  \monthname[\THEMONTH], \THEYEAR}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+% \newdateformat{formatdate}{%
+%   \monthname[\THEMONTH], \THEYEAR}
 
 
+% DOCUMENTS SETTINGS
+\newcommand{\titre}{GMRES préconditionné}
+\newcommand{\devoir}{Analyse Numérique : Devoir 4}
+\newcommand{\auteur}{Romain Graux}
+\newcommand{\noma}{28681700}
 \newcommand{\mytitle}{
-    \raggedbottom
+    % \raggedbottom
     \lhead{\auteur}
-    \rhead{\bottomDate\today}
-    \lfoot{\noma}
+    \rhead{\today}
+    \lfoot{28681700}
     \rfoot{\titre}
     \pagestyle{fancy}
     \begin{center}
-        \Huge{{\textit{\textbf{\titre}}}}
+        \huge{{\textbf{\devoir}}}
 
-        \LARGE{\textbf{\subtitre}}
+        \Huge{\textit{\textbf{\titre}}}
     \end{center}
-    \vspace{0.7cm}
+    % \vspace{0.7cm}
 }

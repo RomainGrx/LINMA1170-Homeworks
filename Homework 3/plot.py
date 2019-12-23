@@ -254,7 +254,6 @@ def complexitylog(precision, save=False, name='complexitylog'):
         plt.plot(logx, logy, selfChar[i], color=selfColors[i])
         plt.plot(ranger, np.poly1d(fit)(ranger), '--',color=selfColors[i])
         plotID.append(fit)
-    plt.text(2, 0.5, 'Coucou')
     plt.legend([names[0],'Polyfit LUsolve : %.2fx+...'%plotID[0][0],names[1],'Polyfit LUcsrsolve sans RCMK: %.2fx+...'%plotID[1][0], names[2], 'Polyfit LUcsrsolve avec RCMK: %.2fx+...'%plotID[2][0]])
     if save : plt.savefig('res/plots/%s.png'%(name))
     else : plt.show()

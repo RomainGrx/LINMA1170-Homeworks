@@ -1,8 +1,9 @@
 TEX = rapport.tex
 PDF = rapport.pdf
-PY  = ndt.py mysolve.py LUcsr.py LU.py plot.py
-RES = res/matrix res/plots res/py res/tex
-ZIP = $(PY) $(TEX) $(PDF) $(RES) Makefile README.md
+PY  = ndt.py csrGMRES.py plot.py
+RES = res/imgs res/plots res/py res/tex
+ZIP = $(PY) $(TEX) $(PDF) $(RES) Makefile
+
 .PHONY : pdf clean
 
 default : pdf
